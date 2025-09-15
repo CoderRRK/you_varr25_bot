@@ -1,0 +1,139 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Угадай число</title>
+    <script src="https://telegram.org/js/you_varr25_bot.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        .game-container {
+            text-align: center;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        input {
+            padding: 10px;
+            font-size: 16px;
+            width: 100px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin: 10px;
+            cursor: pointer;
+        }
+        #result {
+            margin-top: 20px;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>Угадай число от 1 до 100</h1>
+        <input type="number" id="guessInput" min="1" max="100" placeholder="Твой вариант">
+        <br>
+        <button onclick="checkGuess()">Угадать</button>
+        <br>
+        <button onclick="newGame()">Новая игра</button>
+        <div id="result"></div>
+        <button onclick="shareScore()">Поделиться результатом</button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+
+        let secretNumber = Math.floor(Math.random() * 100) + 1;
+        let attempts = 0;
+
+        function checkGuess() {
+            const guess = parseInt(document.getElementById('guessInput').value);
+            attempts++;
+            const result = document.getElementById('result');
+
+            if (isNaN(guess) || guess < 1 || guess > 100) {
+                result.textContent = 'Введите число от 1 до 100!';
+                return;
+            }
+
+            if (guess === secretNumber) {
+                result.textContent = `Поздравляем! Вы угадали за ${attempts} попыток.`;
+                tg.showAlert(`Поздравляем! Вы угадали за ${attempts} попыток.`);
+                tg.MainButton.setText(`Результат: ${attempts} попыток`).show();
+            } else if (guess < secretNumber) {
+                result.textContent = 'Слишком мало! Попробуйте больше.';
+            } else {
+                result.textContent = 'Слишком много! Попробуйте меньше.';
+            }
+
+            document.getElementById('guessInput').value = '';
+        }
+
+        function newGame() {
+            secretNumber = Math.floor(Math.random() * 100) + 1;
+            attempts = 0;
+            document.getElementById('result').textContent = '';
+            tg.MainButton.hide();
+        }
+
+        function shareScore() {
+            if (attempts > 0) {
+                tg.shareUrl(tg.initDataUnsafe.start_param, `Я угадал число за ${attempts} попыток! Играй со мной: https://t.me/yourbot?start=game`);
+            }
+        }
+
+        tg.MainButton.onClick(shareScore);
+    </script>
+</body>
+</html>
